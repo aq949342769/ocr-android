@@ -18,11 +18,8 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -82,9 +79,7 @@ public class VinScannerActivity extends AppCompatActivity {
     private static final String TAG = "VinScannerActivity";
     private static final int CAMERA_PERMISSION_REQUEST = 100;
 
-    private static final String REC_MODEL = "ocr_rec_v3.nb";
-    private static final String DET_MODEL = "ocr_detection.nb";
-    private static final long DETECTION_INTERVAL_MS = 300;
+    private static final long DETECTION_INTERVAL_MS = 200;
 
     private CameraPreview cameraPreview;
     private ScannerOverlayView scannerOverlay;
@@ -112,8 +107,8 @@ public class VinScannerActivity extends AppCompatActivity {
         checkCameraPermission();
 
         executorService = Executors.newSingleThreadExecutor();
-        ocrPredictor = new OCRPredictor(this);
 
+        // 使用OCRModelManager获取已初始化的模型
         initOCRModels();
     }
 
@@ -183,82 +178,50 @@ public class VinScannerActivity extends AppCompatActivity {
     }
 
     private void initOCRModels() {
-        executorService.execute(new Runnable() {
+        // 使用OCRModelManager进行模型初始化（延迟初始化，模型常驻）
+        final OCRModelManager modelManager = OCRModelManager.getInstance(this);
+
+        // 如果模型已经就绪，直接使用
+        if (modelManager.isModelReady()) {
+            ocrPredictor = modelManager.getPredictor();
+            if (ocrPredictor != null) {
+                statusText.setText("OCR模型已加载");
+                statusText.setVisibility(View.VISIBLE);
+                startRealtimeDetection();
+                return;
+            }
+        }
+
+        // 显示加载中状态
+        statusText.setText("正在加载OCR模型...");
+        statusText.setVisibility(View.VISIBLE);
+
+        // 初始化模型
+        modelManager.initModels(this, new OCRModelManager.InitCallback() {
             @Override
-            public void run() {
-                try {
-                    String detectionModelPath = copyAssetToCache(DET_MODEL);
-                    String recognitionModelPath = copyAssetToCache(REC_MODEL);
-
-                    if (recognitionModelPath == null) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                statusText.setText("错误: 未找到识别模型文件\n请运行 ./convert_models.sh");
-                                statusText.setVisibility(View.VISIBLE);
-                            }
-                        });
-                        return;
+            public void onSuccess() {
+                ocrPredictor = modelManager.getPredictor();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        statusText.setText("OCR模型加载成功");
+                        statusText.setVisibility(View.VISIBLE);
+                        startRealtimeDetection();
                     }
+                });
+            }
 
-                    final boolean success = ocrPredictor.init(detectionModelPath, recognitionModelPath);
-
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (success) {
-                                statusText.setText("OCR模型加载成功");
-                                statusText.setVisibility(View.VISIBLE);
-                                startRealtimeDetection();
-                            } else {
-                                statusText.setText("OCR模型加载失败\n请检查模型文件");
-                                statusText.setVisibility(View.VISIBLE);
-                            }
-                        }
-                    });
-
-                } catch (final Exception e) {
-                    Log.e(TAG, "Failed to init OCR models: " + e.getMessage());
-                    e.printStackTrace();
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            statusText.setText("模型初始化失败: " + e.getMessage() + "\n请运行 ./convert_models.sh");
-                            statusText.setVisibility(View.VISIBLE);
-                        }
-                    });
-                }
+            @Override
+            public void onError(final String error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        statusText.setText("OCR模型加载失败: " + error + "\n请运行 ./convert_models.sh");
+                        statusText.setVisibility(View.VISIBLE);
+                    }
+                });
             }
         });
-    }
-
-    private String copyAssetToCache(String assetName) {
-        String cachePath = getCacheDir() + "/" + assetName;
-        File cacheFile = new File(cachePath);
-
-        if (cacheFile.exists()) {
-            return cachePath;
-        }
-
-        try {
-            InputStream is = getAssets().open(assetName);
-            OutputStream os = new BufferedOutputStream(new FileOutputStream(cachePath));
-
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = is.read(buffer)) != -1) {
-                os.write(buffer, 0, bytesRead);
-            }
-
-            os.flush();
-            os.close();
-            is.close();
-
-            return cachePath;
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to copy asset: " + e.getMessage());
-            return null;
-        }
     }
 
     private void startRealtimeDetection() {
