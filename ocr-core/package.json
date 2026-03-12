@@ -1,0 +1,17 @@
+{
+  "name": "OcrCore",
+  "version": "1.0.0",
+  "description": "OCR 核心模块 - VIN扫描识别",
+  "platforms": ["Android"],
+  "app-plus": {
+    "usingComponents": true
+  },
+  "uniPlugin": {
+    "plugins": [
+      {
+        "name": "VinScanner",
+        "class": "com.zhlholding.ocr.VinScannerModule"
+      }
+    ]
+  }
+}

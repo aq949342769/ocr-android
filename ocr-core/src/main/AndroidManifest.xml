@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.zhlholding.ocr">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FLASHLIGHT" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <application>
+        <activity android:name=".VinScannerActivity"
+            android:label="VIN码扫描"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+    </application>
+
+</manifest>

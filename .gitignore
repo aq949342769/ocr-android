@@ -1,0 +1,15 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+/nativeplugins/VinScanner/android/library/build/
+/ocr-core/build
+/ocr-core/.gradle
+
+AGENTS.md
+CLAUDE.md
+.claude

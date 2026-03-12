@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="24dp"
+    tools:context=".MainActivity">
+
+    <TextView
+        android:id="@+id/text_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:text="VIN码识别系统"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/start_scan_button"
+        android:layout_width="240dp"
+        android:layout_height="60dp"
+        android:layout_marginBottom="32dp"
+        android:background="#4CAF50"
+        android:padding="16dp"
+        android:text="开始识别"
+        android:textColor="@android:color/white"
+        android:textSize="20sp" />
+
+    <TextView
+        android:id="@+id/result_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#80000000"
+        android:padding="16dp"
+        android:text="识别结果将显示在这里"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        android:visibility="gone" />
+
+</LinearLayout>

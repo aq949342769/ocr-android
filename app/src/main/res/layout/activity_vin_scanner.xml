@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.zhlholding.ocr.CameraPreview
+        android:id="@+id/camera_preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.zhlholding.ocr.ScannerOverlayView
+        android:id="@+id/scanner_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginTop="32dp"
+        android:background="#80000000"
+        android:padding="16dp"
+        android:text="将VIN码置于扫描框内"
+        android:textColor="@android:color/white"
+        android:textSize="16sp" />
+
+</FrameLayout>
