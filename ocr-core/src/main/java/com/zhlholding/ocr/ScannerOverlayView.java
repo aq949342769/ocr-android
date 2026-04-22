@@ -14,6 +14,7 @@ import java.util.List;
 
 public class ScannerOverlayView extends View {
     private Paint paint;
+    private Paint maskPaint;
     private Paint borderPaint;
     private Paint cornerPaint;
     private Paint detectionPaint;
@@ -22,7 +23,7 @@ public class ScannerOverlayView extends View {
     private List<float[]> detectionBoxes;
     private static final int CORNER_LENGTH = 40;
     private static final int CORNER_WIDTH = 8;
-    
+
     private static final int DETECTION_COLOR = Color.parseColor("#FF0000");
 
     public ScannerOverlayView(Context context) {
@@ -41,10 +42,10 @@ public class ScannerOverlayView extends View {
     }
 
     @Override
-    public void onAttachedToWindow() {
+    protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        // 确保视图在最上层
-        bringToFront();
+        // 注意：不要在这里调用 bringToFront()，否则会遮挡同层级中定义在后面的视图（如 TextView）
+        // 视图层级由 XML 中的定义顺序决定，后定义的视图会在前面
     }
 
     private void init() {
@@ -53,15 +54,19 @@ public class ScannerOverlayView extends View {
 
         paint = new Paint();
         paint.setColor(Color.TRANSPARENT);
-        
+
+        maskPaint = new Paint();
+        maskPaint.setColor(Color.BLACK);
+        maskPaint.setAlpha(150);
+
         borderPaint = new Paint();
-        borderPaint.setColor(Color.GREEN);
+        borderPaint.setColor(Color.TRANSPARENT);
         borderPaint.setStyle(Paint.Style.STROKE);
         borderPaint.setStrokeWidth(3);
         borderPaint.setAntiAlias(true);
-        
+
         cornerPaint = new Paint();
-        cornerPaint.setColor(Color.GREEN);
+        cornerPaint.setColor(Color.TRANSPARENT);
         cornerPaint.setStyle(Paint.Style.STROKE);
         cornerPaint.setStrokeWidth(CORNER_WIDTH);
         cornerPaint.setAntiAlias(true);
@@ -84,9 +89,9 @@ public class ScannerOverlayView extends View {
 
         // 占满屏幕宽度，不留左右边框
         int scanWidth = w;
-        int scanHeight = (int) (h * 0.15);
+        int scanHeight = (int) (h * 0.08);
         int left = 0;
-        int top = (h - scanHeight) / 2;
+        int top = (int) (h * 0.15); // 扫描区域上移
 
         scanRect = new RectF(left, top, left + scanWidth, top + scanHeight);
     }
@@ -126,6 +131,11 @@ public class ScannerOverlayView extends View {
         }
         
         if (scanRect != null) {
+            // 绘制半透明黑色遮罩（非扫描区域）
+            int w = getWidth();
+            canvas.drawRect(0, 0, w, scanRect.top, maskPaint); // 上方
+            canvas.drawRect(0, scanRect.bottom, w, getHeight(), maskPaint); // 下方
+
             canvas.drawRect(scanRect, borderPaint);
             
             float left = scanRect.left;
