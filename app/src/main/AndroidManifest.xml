@@ -17,7 +17,7 @@
         
         <activity android:name=".MainActivity"
             android:exported="true"
-            android:label="VIN码识别">
+            android:label="YD_SCAN">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
