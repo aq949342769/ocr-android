@@ -86,6 +86,8 @@ public class VinScannerActivity extends AppCompatActivity {
     private TextView statusText;
 
     private OCRPredictor ocrPredictor;
+    private OCRModelManager modelManager;
+    private FrameProcessor frameProcessor;
     private ExecutorService executorService;
     private boolean isProcessing = false;
     private byte[] currentFrame;
@@ -97,19 +99,69 @@ public class VinScannerActivity extends AppCompatActivity {
 
     private OnVinResultListener vinResultListener;
 
+    // Intent 参数 Keys
+    public static final String EXTRA_POWER_MODE = "extra_power_mode";
+    public static final String EXTRA_THREADS = "extra_threads";
+    public static final String EXTRA_ENABLE_DEBUG = "extra_enable_debug";
+    public static final String EXTRA_DEBUG_PATH = "extra_debug_path";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 检查调用者包名
+        if (!OcrSecurity.checkCallingPackage(this)) {
+            Log.e(TAG, "Calling package not allowed");
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_vin_scanner);
+
+        // 从 Intent 读取配置
+        OCRConfig config = parseConfigFromIntent(getIntent());
 
         initViews();
         checkCameraPermission();
 
         executorService = Executors.newSingleThreadExecutor();
 
-        // 使用OCRModelManager获取已初始化的模型
-        initOCRModels();
+        // 使用配置初始化 OCR 模型
+        initOCRModels(config);
+    }
+
+    /**
+     * 从 Intent 解析配置
+     */
+    private OCRConfig parseConfigFromIntent(Intent intent) {
+        if (intent == null) {
+            return new OCRConfig();
+        }
+
+        OCRConfig.Builder builder = new OCRConfig.Builder();
+
+        // 设置功率模式
+        int powerModeOrdinal = intent.getIntExtra(EXTRA_POWER_MODE, -1);
+        if (powerModeOrdinal >= 0 && powerModeOrdinal < com.baidu.paddle.lite.PowerMode.values().length) {
+            builder.setPowerMode(com.baidu.paddle.lite.PowerMode.values()[powerModeOrdinal]);
+        }
+
+        // 设置线程数
+        int threads = intent.getIntExtra(EXTRA_THREADS, -1);
+        if (threads > 0) {
+            builder.setThreads(threads);
+        }
+
+        // 设置调试图片
+        boolean enableDebug = intent.getBooleanExtra(EXTRA_ENABLE_DEBUG, false);
+        builder.setEnableDebugImageSave(enableDebug);
+
+        String debugPath = intent.getStringExtra(EXTRA_DEBUG_PATH);
+        if (debugPath != null && !debugPath.isEmpty()) {
+            builder.setDebugImageSavePath(debugPath);
+        }
+
+        return builder.build();
     }
 
     private void initViews() {
@@ -122,6 +174,10 @@ public class VinScannerActivity extends AppCompatActivity {
             public void onPreviewFrame(byte[] data, Camera camera) {
                 if (!isProcessing && isDetecting.compareAndSet(false, true)) {
                     previewSize = cameraPreview.getPreviewSize();
+
+                    // 使用 FrameProcessor 处理帧
+                    frameProcessor.processFrame(data, previewSize.width, previewSize.height);
+
                     currentFrame = data;
                 }
             }
@@ -177,9 +233,12 @@ public class VinScannerActivity extends AppCompatActivity {
         }
     }
 
-    private void initOCRModels() {
+    private void initOCRModels(OCRConfig config) {
         // 使用OCRModelManager进行模型初始化（延迟初始化，模型常驻）
-        final OCRModelManager modelManager = OCRModelManager.getInstance(this);
+        modelManager = OCRModelManager.getInstance(this);
+
+        // 初始化帧处理器
+        frameProcessor = new FrameProcessor();
 
         // 如果模型已经就绪，直接使用
         if (modelManager.isModelReady()) {
@@ -196,8 +255,8 @@ public class VinScannerActivity extends AppCompatActivity {
         statusText.setText("正在加载OCR模型...");
         statusText.setVisibility(View.VISIBLE);
 
-        // 初始化模型
-        modelManager.initModels(this, new OCRModelManager.InitCallback() {
+        // 使用传入的配置初始化模型
+        modelManager.initModels(this, config, new OCRModelManager.InitCallback() {
             @Override
             public void onSuccess() {
                 ocrPredictor = modelManager.getPredictor();
@@ -238,8 +297,11 @@ public class VinScannerActivity extends AppCompatActivity {
                             continue;
                         }
 
-                        byte[] frameData = currentFrame;
+                        byte[] frameData;
                         Camera.Size size = previewSize;
+
+                        // 使用 FrameProcessor 获取最佳帧
+                        frameData = frameProcessor.getBestFrame(currentFrame);
 
                         if (frameData != null && size != null) {
                             performDetection(frameData, size);
@@ -633,6 +695,10 @@ public class VinScannerActivity extends AppCompatActivity {
             public void onPreviewFrame(byte[] data, Camera camera) {
                 if (!isProcessing && isDetecting.compareAndSet(false, true)) {
                     previewSize = cameraPreview.getPreviewSize();
+
+                    // 使用 FrameProcessor 处理帧
+                    frameProcessor.processFrame(data, previewSize.width, previewSize.height);
+
                     currentFrame = data;
                 }
             }
@@ -684,8 +750,23 @@ public class VinScannerActivity extends AppCompatActivity {
     }
 
     private void saveDebugBitmap(Bitmap bitmap, String prefix) {
+        // 从 Manager 获取配置
+        OCRConfig config = modelManager != null ? modelManager.getConfig() : null;
+
+        // 检查是否启用了调试图片保存
+        if (config == null || !config.isEnableDebugImageSave()) {
+            return;
+        }
+
         try {
-            File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "OCR_Debug");
+            String basePath;
+            if (config.getDebugImageSavePath() != null && !config.getDebugImageSavePath().isEmpty()) {
+                basePath = config.getDebugImageSavePath();
+            } else {
+                basePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath() + "/OCR_Debug";
+            }
+
+            File dir = new File(basePath);
             if (!dir.exists()) {
                 dir.mkdirs();
             }

@@ -29,6 +29,7 @@ public class OCRModelManager {
 
     private static OCRModelManager sInstance;
     private OCRPredictor ocrPredictor;
+    private OCRConfig ocrConfig;
     private Context appContext;
     private boolean isModelReady = false;
     private boolean isInitializing = false;
@@ -54,13 +55,26 @@ public class OCRModelManager {
     }
 
     /**
-     * 初始化模型（延迟初始化）
+     * 初始化模型（使用默认配置）
      * 如果模型已经就绪，直接回调成功
      *
      * @param context 上下文
      * @param callback 初始化回调
      */
     public synchronized void initModels(final Context context, final InitCallback callback) {
+        initModels(context, new OCRConfig(), callback);
+    }
+
+    /**
+     * 使用配置对象初始化模型
+     * 如果模型已经就绪，直接回调成功
+     *
+     * @param context 上下文
+     * @param config  配置对象
+     * @param callback 初始化回调
+     */
+    public synchronized void initModels(final Context context, final OCRConfig config,
+                                       final InitCallback callback) {
         if (isModelReady && ocrPredictor != null) {
             Log.d(TAG, "Models already initialized, skipping...");
             if (callback != null) {
@@ -82,8 +96,18 @@ public class OCRModelManager {
             public void run() {
                 try {
                     Context ctx = context.getApplicationContext();
-                    String detectionModelPath = copyAssetToCache(ctx, DET_MODEL);
-                    String recognitionModelPath = copyAssetToCache(ctx, REC_MODEL);
+                    String detectionModelPath = config.getDetectionModelPath();
+                    String recognitionModelPath = config.getRecognitionModelPath();
+
+                    // 如果配置中未指定模型路径，使用默认的 asset 文件
+                    if (detectionModelPath == null) {
+                        detectionModelPath = copyAssetToCache(ctx, DET_MODEL);
+                        config.setDetectionModelPath(detectionModelPath);
+                    }
+                    if (recognitionModelPath == null) {
+                        recognitionModelPath = copyAssetToCache(ctx, REC_MODEL);
+                        config.setRecognitionModelPath(recognitionModelPath);
+                    }
 
                     if (recognitionModelPath == null) {
                         Log.e(TAG, "Recognition model not found");
@@ -94,16 +118,18 @@ public class OCRModelManager {
                         return;
                     }
 
+                    // 使用配置初始化 predictor
                     OCRPredictor predictor = new OCRPredictor(ctx);
-                    boolean success = predictor.init(detectionModelPath, recognitionModelPath);
+                    boolean success = predictor.init(ctx, config);
 
                     if (success) {
                         synchronized (OCRModelManager.this) {
                             ocrPredictor = predictor;
+                            ocrConfig = config;
                             isModelReady = true;
                             isInitializing = false;
                         }
-                        Log.d(TAG, "Models initialized successfully");
+                        Log.d(TAG, "Models initialized successfully with config");
                         if (callback != null) {
                             callback.onSuccess();
                         }
@@ -134,6 +160,14 @@ public class OCRModelManager {
     }
 
     /**
+     * 获取 OCR 配置
+     * 如果模型未初始化或未通过配置初始化，返回null
+     */
+    public synchronized OCRConfig getConfig() {
+        return ocrConfig;
+    }
+
+    /**
      * 检查模型是否就绪
      */
     public synchronized boolean isModelReady() {
@@ -152,12 +186,15 @@ public class OCRModelManager {
      * 当应用进入后台或内存不足时调用
      */
     public synchronized void releaseModels() {
-        if (!isModelReady) {
+        if (!isModelReady && ocrPredictor == null) {
             return;
         }
 
         Log.d(TAG, "Releasing OCR models...");
-        ocrPredictor = null;
+        if (ocrPredictor != null) {
+            ocrPredictor.destroy();
+            ocrPredictor = null;
+        }
         isModelReady = false;
         isInitializing = false;
 

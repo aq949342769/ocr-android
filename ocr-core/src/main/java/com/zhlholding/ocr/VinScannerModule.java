@@ -8,6 +8,7 @@ import android.content.IntentFilter;
 import android.util.Log;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baidu.paddle.lite.PowerMode;
 
 import io.dcloud.feature.uniapp.annotation.UniJSMethod;
 import io.dcloud.feature.uniapp.bridge.UniJSCallback;
@@ -19,6 +20,10 @@ import io.dcloud.feature.uniapp.common.UniModule;
  * uni-app 调用示例：
  * const vinScanner = uni.requireNativePlugin('VinScanner');
  * vinScanner.startScan({
+ *     powerMode: 0,        // 可选: 0=LITE_POWER_LOW, 1=LITE_POWER_HIGH, 2=LITE_POWER_FULL, 3=LITE_POWER_NO_BIND
+ *     threads: 4,           // 可选: 线程数，默认4
+ *     enableDebug: false,  // 可选: 是否保存调试图片，默认false
+ *     debugPath: '',       // 可选: 调试图片保存路径
  *     success: (res) => {
  *         console.log('VIN:', res.vinCode);
  *         console.log('原始结果:', res.rawResult);
@@ -41,9 +46,10 @@ public class VinScannerModule extends UniModule {
 
     /**
      * 启动VIN扫描
+     * @param options 配置参数，可选包含 powerMode, threads, enableDebug, debugPath
      */
     @UniJSMethod
-    public void startScan(UniJSCallback callback) {
+    public void startScan(JSONObject options, UniJSCallback callback) {
         mCallback = callback;
 
         // 注册广播接收器
@@ -65,6 +71,22 @@ public class VinScannerModule extends UniModule {
 
         // 启动VIN扫描Activity
         Intent intent = new Intent(context, VinScannerActivity.class);
+
+        // 传递配置参数
+        if (options != null) {
+            if (options.containsKey("powerMode")) {
+                intent.putExtra(VinScannerActivity.EXTRA_POWER_MODE, options.getInteger("powerMode"));
+            }
+            if (options.containsKey("threads")) {
+                intent.putExtra(VinScannerActivity.EXTRA_THREADS, options.getInteger("threads"));
+            }
+            if (options.containsKey("enableDebug")) {
+                intent.putExtra(VinScannerActivity.EXTRA_ENABLE_DEBUG, options.getBoolean("enableDebug"));
+            }
+            if (options.containsKey("debugPath")) {
+                intent.putExtra(VinScannerActivity.EXTRA_DEBUG_PATH, options.getString("debugPath"));
+            }
+        }
 
         if (context instanceof Activity) {
             ((Activity) context).startActivityForResult(intent, REQUEST_CODE_SCAN);

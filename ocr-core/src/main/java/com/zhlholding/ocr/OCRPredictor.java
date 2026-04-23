@@ -48,30 +48,56 @@ public class OCRPredictor {
         }
     }
     
-    public boolean init(String detectionModelPath, String recognitionModelPath) {
+    /**
+     * 使用配置对象初始化 OCR 模型
+     *
+     * @param context 上下文
+     * @param config  配置对象，包含模型路径、功率模式、线程数等参数
+     * @return 初始化是否成功
+     */
+    public boolean init(Context context, OCRConfig config) {
+        if (config == null) {
+            Log.e(TAG, "OCRConfig is null, cannot initialize");
+            return false;
+        }
+        return init(config.getDetectionModelPath(), config.getRecognitionModelPath(),
+                    config.getPowerMode(), config.getThreads());
+    }
+
+    /**
+     * 初始化 OCR 模型（使用指定功率模式和线程数）
+     *
+     * @param detectionModelPath  检测模型路径
+     * @param recognitionModelPath 识别模型路径
+     * @param powerMode 功率模式
+     * @param threads 线程数
+     * @return 初始化是否成功
+     */
+    private boolean init(String detectionModelPath, String recognitionModelPath,
+                         PowerMode powerMode, int threads) {
         try {
             // 加载检测模型
             if (detectionModelPath != null && new java.io.File(detectionModelPath).exists()) {
                 MobileConfig detConfig = new MobileConfig();
                 detConfig.setModelFromFile(detectionModelPath);
-                detConfig.setPowerMode(PowerMode.LITE_POWER_HIGH);
-                detConfig.setThreads(4);
+                detConfig.setPowerMode(powerMode);
+                detConfig.setThreads(threads);
                 detector = PaddlePredictor.createPaddlePredictor(detConfig);
                 Log.d(TAG, "Detection model loaded: " + detectionModelPath);
             } else {
                 Log.w(TAG, "Detection model not found, will skip detection: " + detectionModelPath);
             }
-            
+
             // 加载识别模型
             if (recognitionModelPath == null || !new java.io.File(recognitionModelPath).exists()) {
                 Log.e(TAG, "Recognition model not found: " + recognitionModelPath);
                 return false;
             }
-            
+
             MobileConfig recogConfig = new MobileConfig();
             recogConfig.setModelFromFile(recognitionModelPath);
-            recogConfig.setPowerMode(PowerMode.LITE_POWER_HIGH);
-            recogConfig.setThreads(4);
+            recogConfig.setPowerMode(powerMode);
+            recogConfig.setThreads(threads);
             recognizer = PaddlePredictor.createPaddlePredictor(recogConfig);
             String version = recognizer.getVersion();
             Log.d(TAG, "paddle lite version" + version);
@@ -82,6 +108,24 @@ public class OCRPredictor {
             Log.e(TAG, "Failed to initialize OCR model: " + e.getMessage());
             e.printStackTrace();
             return false;
+        }
+    }
+
+    /**
+     * 释放 OCR 模型资源
+     * 调用此方法后，检测和识别功能将不可用，需要重新调用 init 初始化
+     * 注意：PaddlePredictor 不提供 destroy() 方法，资源由 GC 管理
+     */
+    public void destroy() {
+        synchronized (lock) {
+            if (detector != null) {
+                detector = null;
+                Log.d(TAG, "Detector released");
+            }
+            if (recognizer != null) {
+                recognizer = null;
+                Log.d(TAG, "Recognizer released");
+            }
         }
     }
     

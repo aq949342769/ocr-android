@@ -11,6 +11,7 @@
     <application>
         <activity android:name=".VinScannerActivity"
             android:label="VIN码扫描"
+            android:exported="true"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
     </application>
 
