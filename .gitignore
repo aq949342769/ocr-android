@@ -10,6 +10,9 @@
 /ocr-core/build
 /ocr-core/.gradle
 
+# Release signing credentials
+/signing/
+
 AGENTS.md
 CLAUDE.md
 .claude
