@@ -25,4 +25,16 @@
         android:textColor="@android:color/white"
         android:textSize="16sp" />
 
+    <ImageButton
+        android:id="@+id/flash_button"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="120dp"
+        android:background="@drawable/bg_flash_button_selector"
+        android:contentDescription="闪光灯"
+        android:padding="18dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_light" />
+
 </FrameLayout>

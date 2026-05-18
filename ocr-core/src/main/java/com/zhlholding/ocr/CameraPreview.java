@@ -10,9 +10,15 @@ import java.io.IOException;
 import java.util.List;
 
 public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback {
+    public interface OnCameraReadyListener {
+        void onCameraReady();
+    }
+
     private SurfaceHolder mHolder;
     private Camera mCamera;
     private Camera.PreviewCallback previewCallback;
+    private OnCameraReadyListener cameraReadyListener;
+    private boolean flashEnabled = false;
 
     public CameraPreview(Context context) {
         super(context);
@@ -42,6 +48,10 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         }
     }
 
+    public void setOnCameraReadyListener(OnCameraReadyListener listener) {
+        this.cameraReadyListener = listener;
+    }
+
     public void surfaceCreated(SurfaceHolder holder) {
         try {
             mCamera = Camera.open();
@@ -52,6 +62,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             Camera.Size optimalSize = getOptimalPreviewSize(sizes, 1920, 1080);
             parameters.setPreviewSize(optimalSize.width, optimalSize.height);
             parameters.setPreviewFormat(ImageFormat.NV21);
+            applyFlashMode(parameters);
 
             // 启用自动对焦
             List<String> focusModes = parameters.getSupportedFocusModes();
@@ -68,8 +79,11 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             if (previewCallback != null) {
                 mCamera.setPreviewCallback(previewCallback);
             }
-            
+
             mCamera.startPreview();
+            if (cameraReadyListener != null) {
+                cameraReadyListener.onCameraReady();
+            }
         } catch (IOException e) {
             // Ignore
         }
@@ -81,6 +95,10 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             mCamera.stopPreview();
             mCamera.release();
             mCamera = null;
+            flashEnabled = false;
+            if (cameraReadyListener != null) {
+                cameraReadyListener.onCameraReady();
+            }
         }
     }
 
@@ -128,5 +146,56 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             return mCamera.getParameters().getPreviewSize();
         }
         return null;
+    }
+
+    public boolean isFlashSupported() {
+        if (mCamera == null) {
+            return false;
+        }
+
+        Camera.Parameters parameters = mCamera.getParameters();
+        List<String> flashModes = parameters.getSupportedFlashModes();
+        return flashModes != null && flashModes.contains(Camera.Parameters.FLASH_MODE_TORCH);
+    }
+
+    public boolean setFlashEnabled(boolean enabled) {
+        if (mCamera == null) {
+            flashEnabled = enabled;
+            return false;
+        }
+
+        try {
+            Camera.Parameters parameters = mCamera.getParameters();
+            List<String> flashModes = parameters.getSupportedFlashModes();
+            if (flashModes == null || !flashModes.contains(Camera.Parameters.FLASH_MODE_TORCH)) {
+                flashEnabled = false;
+                return false;
+            }
+
+            flashEnabled = enabled;
+            applyFlashMode(parameters);
+            mCamera.setParameters(parameters);
+            return true;
+        } catch (RuntimeException e) {
+            flashEnabled = false;
+            return false;
+        }
+    }
+
+    public boolean isFlashEnabled() {
+        return flashEnabled;
+    }
+
+    private void applyFlashMode(Camera.Parameters parameters) {
+        List<String> flashModes = parameters.getSupportedFlashModes();
+        if (flashModes == null) {
+            return;
+        }
+
+        if (flashEnabled && flashModes.contains(Camera.Parameters.FLASH_MODE_TORCH)) {
+            parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+        } else if (flashModes.contains(Camera.Parameters.FLASH_MODE_OFF)) {
+            parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+        }
     }
 }

@@ -15,6 +15,7 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -84,6 +85,7 @@ public class VinScannerActivity extends AppCompatActivity {
     private CameraPreview cameraPreview;
     private ScannerOverlayView scannerOverlay;
     private TextView statusText;
+    private ImageButton flashButton;
 
     private OCRPredictor ocrPredictor;
     private OCRModelManager modelManager;
@@ -92,6 +94,7 @@ public class VinScannerActivity extends AppCompatActivity {
     private boolean isProcessing = false;
     private byte[] currentFrame;
     private Camera.Size previewSize;
+    private boolean isFlashEnabled = false;
 
     private Thread detectionThread;
     private AtomicBoolean isDetecting = new AtomicBoolean(false);
@@ -168,6 +171,27 @@ public class VinScannerActivity extends AppCompatActivity {
         cameraPreview = findViewById(R.id.camera_preview);
         scannerOverlay = findViewById(R.id.scanner_overlay);
         statusText = findViewById(R.id.status_text);
+        flashButton = findViewById(R.id.flash_button);
+        flashButton.setEnabled(false);
+        flashButton.setAlpha(0.5f);
+
+        flashButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleFlash();
+            }
+        });
+        cameraPreview.setOnCameraReadyListener(new CameraPreview.OnCameraReadyListener() {
+            @Override
+            public void onCameraReady() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateFlashButton();
+                    }
+                });
+            }
+        });
 
         cameraPreview.setPreviewCallback(new Camera.PreviewCallback() {
             @Override
@@ -182,6 +206,25 @@ public class VinScannerActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private void toggleFlash() {
+        boolean nextFlashState = !isFlashEnabled;
+        if (cameraPreview.setFlashEnabled(nextFlashState)) {
+            isFlashEnabled = nextFlashState;
+            updateFlashButton();
+        } else {
+            isFlashEnabled = false;
+            updateFlashButton();
+            Toast.makeText(this, "当前设备不支持闪光灯", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void updateFlashButton() {
+        boolean flashSupported = cameraPreview.isFlashSupported();
+        flashButton.setEnabled(flashSupported);
+        flashButton.setAlpha(flashSupported ? 1.0f : 0.5f);
+        flashButton.setSelected(isFlashEnabled);
     }
 
     private void checkCameraPermission() {
@@ -790,6 +833,9 @@ public class VinScannerActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (cameraPreview != null) {
+            cameraPreview.setFlashEnabled(false);
+        }
         super.onDestroy();
         stopRealtimeDetection();
         if (executorService != null) {
